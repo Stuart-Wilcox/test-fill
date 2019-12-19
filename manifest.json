@@ -4,7 +4,9 @@
     "description": "Auto populate a form with dummy data",
     "permissions": [
         "storage",
-        "activeTab"
+        "activeTab",
+        "http://*/*",
+        "https://*/*"
     ],
     "background": {
         "scripts": ["background.js"],
@@ -14,7 +16,7 @@
         "default_popup": "popup.html"
     },
     "content_scripts": [{
-        "matches": ["http://localhost/*", "http://localhost:3000/*"],
+        "matches": ["http://*/*", "https://*/*"],
         "js": ["contentScript.js"]
     }],
     "manifest_version": 2

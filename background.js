@@ -1,5 +1,12 @@
 const initialState = {
-    count: 0,
+    countSettings: 10,
+    replacementSettings: {
+        text: 0,
+        select: 0,
+        email: 0,
+        checkbox: 0,
+        radio: 0,
+    },
 };
 
 // initialize context
