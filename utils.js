@@ -65,6 +65,48 @@ const UTILS = (function(){
                 });
             })
         },
+
+        /**
+         * Return selectionState in callback
+         */
+        getSelectState: async (callback) => {
+            return new Promise(resolve => {
+                chrome.storage.local.get(['state'], ({ state }) => {
+                    const {
+                        selectionState={
+                            firstClickPos: null,
+                            secondClickPos: null,
+                        },
+                    } = state;
+
+                    if (callback) {
+                        callback(selectionState)
+                    }
+                    resolve(selectionState);
+                });
+            });
+        },
+
+        /**
+         * Update the selection state, return new selectionState in callback
+         */
+        setSelectState: async (selectionState, callback) => {
+            return new Promise(resolve => {
+                chrome.storage.local.get(['state'], ({ state }) => {
+                    const newState = {
+                        ...state,
+                        selectionState: selectionState,
+                    };
+
+                    chrome.storage.local.set({ state: newState }, () => {
+                        if (callback) {
+                            callback(newState)
+                        }
+                        resolve(newState);
+                    });
+                });
+            });
+        },
     };
 
     return UTILS;

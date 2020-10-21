@@ -44,6 +44,8 @@ var main = (function(){
     const CONSTANTS = {
         GET_STATE: 'get_state',
         GET_CONSTANTS: 'get_constants',
+        GET_SELECT_STATE: 'get_select_state',
+        SET_SELECT_STATE: 'set_select_state',
         KEYPRESS_EVENT_LISTENER: null,
         MOUSEDOWN_EVENT_LISTENER: null,
         MOUSEUP_EVENT_LISTENER: null,
@@ -52,9 +54,10 @@ var main = (function(){
 
     /* ===== MESSAGE_SENDER ===== */
     const MESSAGE_SENDER = {
-        send: async (message, callback) => {
+        send: async (message, payload, callback) => {
             return new Promise(resolve => {
-                chrome.runtime.sendMessage({ message }, ({ message }) => {
+                chrome.runtime.sendMessage({ message, payload }, (response={}) => {
+                    const { message=null } = response;
                     if (callback) {
                         callback(message);
                     }
@@ -68,6 +71,8 @@ var main = (function(){
     /* ===== UTILS ===== */
     const UTILS = {
         getState: async () => MESSAGE_SENDER.send(CONSTANTS.GET_STATE),
+        getSelectionState: async () => MESSAGE_SENDER.send(CONSTANTS.GET_SELECT_STATE),
+        setSelectionState: async (selectionState) => MESSAGE_SENDER.send(CONSTANTS.SET_SELECT_STATE, selectionState),
         getConstants: async () => MESSAGE_SENDER.send(CONSTANTS.GET_CONSTANTS),
         getStyle: styleObj => Object.keys(styleObj).map(key => `${key}:${styleObj[key]}`).join('; '),
     };
@@ -79,10 +84,15 @@ var main = (function(){
         const [state, constants] = await Promise.all([ UTILS.getState(), UTILS.getConstants() ]);
 
         //  make rootElement on page
-        const rootElement = document.createElement('div');
+        let rootElement = document.querySelector('#textFillRoot');
+        if (rootElement) {
+            return;
+        }
+
+        rootElement = document.createElement('div');
         rootElement.setAttribute('id', 'testFillRoot');
         document.body.appendChild(rootElement);
-
+        
         // setup what happens when you hit escape and enter key
         CONSTANTS.KEYPRESS_EVENT_LISTENER = document.addEventListener('keydown', event => {
             // escape key pressed
@@ -97,19 +107,73 @@ var main = (function(){
 
         // setup what happens when you mousedown
         CONSTANTS.MOUSEDOWN_EVENT_LISTENER = rootElement.addEventListener('mousedown', event => {
-            const { pageX: x, pageY: y } = event; 
+            const { pageX: x, pageY: y } = event;
             console.log('mousedown', { x, y });
+
+            // get the refreshed state
+            UTILS.getSelectionState().then(selectionState => {
+                const newState = { ...selectionState };
+
+                // if first state is set, ignore this and reset
+                // something went wrong
+                if (selectionState.fistClickPos) {
+                    newState = {};
+                }
+                else {
+                    newState.firstClickPos = { x, y };
+                }
+
+                // update the selectState
+                UTILS.setSelectionState(newState);
+
+                // refresh 
+                run();
+            });
         });
 
         // setup what happens when you mouseup
         CONSTANTS.MOUSEUP_EVENT_LISTENER = rootElement.addEventListener('mouseup', event => {
             const { pageX: x, pageY: y } = event; 
             console.log('mouseup', { x, y });
+
+            // get the refreshed state
+            UTILS.getSelectionState().then(selectionState => {
+                const newState = { ...selectionState };
+
+                // if first state is not set, ignore this and reset
+                // something went wrong
+                if (!selectionState.fistClickPos) {
+                    newState = {};
+                }
+                // if second state is set, ignore this and reset
+                // something went wrong
+                else if (selectionState.secondClickPos) {
+                    newState = {};
+                }
+                else {
+                    newState.secondClickPos = { x, y };
+                }
+
+                // update the selectState
+                UTILS.setSelectionState(newState);
+
+                // refresh
+                run();
+            });
         });
     };
 
     const run = async () => {
+        // get the refreshed selection state
+        const selectionState = await UTILS.getSelectionState();
+        console.log(selectionState);
+
         const rootElement = document.querySelector('#testFillRoot');
+
+        if (!rootElement) {
+            console.warn('Root not found, operation terminated');
+            return;
+        }
 
         // add backdrop to page
         const backdropElement = document.createElement('div');
@@ -131,11 +195,5 @@ var main = (function(){
     return { init, run };
 })();
 
-
-if(!window.__testFillLoaded) {
-    console.log('INIT');
-    main.init().then(() => main.run());
-    window.__testFillLoaded = true;
-} else {
-    main.run();
-}
+// init then run
+main.init().then(() => main.run());
