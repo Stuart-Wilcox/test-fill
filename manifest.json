@@ -6,7 +6,7 @@
     "content_scripts": [
         {
             "matches": ["*://*.mozilla.org/*"],
-            "js": ["testFill.js"]
+            "js": ["content-scripts/test-fill.js"]
         }
     ],
     "permissions": [
