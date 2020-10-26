@@ -14,6 +14,23 @@ class Tabs {
             return _tabs;
         }
     }
+
+    static async getCurrentTab() {
+        return new Promise((resolve, reject) => {
+            Tabs.tabs.query({ active: true, currentWindow: true }, tabs => {
+                if (Service.runtime.lastError) {
+                    reject(Service.runtime.lastError);
+                    return;
+                }
+                if (tabs[0]) {
+                    resolve(tabs[0]);
+                }
+                else {
+                    reject(new Error('Tab matching query not found'));
+                }
+            });
+        });
+    }
 }
 
 /***** STORE *****/
@@ -65,7 +82,7 @@ class Store {
      */
     async getSavedPageInputs(hashCode) {
         new Promise((resolve, reject) => {
-            Store.storage.local.get(hashCode, (item) => {
+            Store.storage.local.get(`${hashCode}`, (item) => {
                 if (Service.runtime.lastError) {
                     reject(Service.runtime.lastError);
                 }
@@ -98,10 +115,16 @@ class Service {
 
     async sendMessage(type, payload) {
         const message = { type, payload };
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             try {
-                Service.runtime.sendMessage(message, response => {
-                    resolve(response);
+                const tab = await Tabs.getCurrentTab();
+                Tabs.tabs.sendMessage(tab.id, message, response => {
+                    if (Service.runtime.lastError) {
+                        reject(Service.runtime.lastError);
+                    }
+                    else {
+                        resolve(response);
+                    }
                 })
             }
             catch (error) {
@@ -171,7 +194,18 @@ class PopupDocumentController {
 
         // execute the content script in the browser tab
         // wait until execution complete before we continue
-        await Tabs.tabs.executeScript({ file: 'content-scripts/test-fill.js' });
+        try {
+            await Tabs.tabs.executeScript({ file: 'content-scripts/test-fill.js' });
+        }
+        catch (error) {
+            console.log('Failed to execute content script');
+            console.error(error);
+        }
+        finally {
+            if (Service.runtime.lastError) {
+                console.log(Service.runtime.lastError);
+            }
+        }
 
         const saveNameInput = this.saveNameInput;
         const saveNameButton = this.saveNameButton;
