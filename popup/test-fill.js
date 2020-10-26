@@ -1,4 +1,22 @@
-/***** STORAGE *****/
+/***** TABS *****/
+class Tabs {
+    static get tabs() {
+        let _tabs;
+        try {
+            if (tabs) {
+                _tabs = tabs;
+            }
+        }
+        catch (error) {
+            _tabs = chrome.tabs;
+        }
+        finally {
+            return _tabs;
+        }
+    }
+}
+
+/***** STORE *****/
 class Store {
     static get storage() {
         let _storage;
@@ -27,7 +45,7 @@ class Store {
      */
     async savePageInputs(hashCode, name, inputs) {
         // get everything in storage already
-        const savedPageInputs = await this.getSavedPageInputs(hashCode);
+        const savedPageInputs = (await this.getSavedPageInputs(hashCode)) || {};
         savedPageInputs[name] = inputs;
         return new Promise((resolve, reject) => {
             Store.storage.local.set({ [hashCode]: savedPageInputs }, () => {
@@ -52,7 +70,7 @@ class Store {
                     reject(Service.runtime.lastError);
                 }
                 else {
-                    resolve(item || {});
+                    resolve(item);
                 }
             });
         });
@@ -150,6 +168,10 @@ class PopupDocumentController {
             return;
         }
         this.hasInit = true;
+
+        // execute the content script in the browser tab
+        // wait until execution complete before we continue
+        await Tabs.tabs.executeScript({ file: 'content-scripts/test-fill.js' });
 
         const saveNameInput = this.saveNameInput;
         const saveNameButton = this.saveNameButton;

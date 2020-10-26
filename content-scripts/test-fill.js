@@ -3,7 +3,15 @@
 (function() {
     console.log('CONTENT SCRIPT')
 
-    const runtime = browser ? browser.runtime : chrome.runtime;
+    let runtime;
+    try {
+        if (browser) {
+            runtime = browser.runtime;
+        }
+    }
+    catch (error) {
+        runtime = chrome.runtime;
+    }
 
     /** 
      * Get hash from a string

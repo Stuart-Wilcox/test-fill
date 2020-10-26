@@ -1,1 +1,1 @@
-zip -r -FS ../test-fill.zip * --exclude '*.git*'
+zip -r -FS test-fill.zip * --exclude '*.git*'
