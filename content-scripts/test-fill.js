@@ -22,15 +22,12 @@
     const scanPageForInputs = () => {
         // get all the inputs on the page
         const inputs = Array.from(document.querySelectorAll('input'));
-        console.log(inputs);
 
         const inputMap = inputs.reduce((inputMap, input) => {
             inputMap[input.name] = input.value;
             return inputMap;
         }, {});
-        console.log(inputMap);
         const inputNames = inputs.map(input => input.name).join('');
-        console.log(inputNames);
         const inputNamesHashCode = hashCode(inputNames);
 
         return {
@@ -40,12 +37,25 @@
     };
 
     /**
-     * Searches the document for all the inputs and applies their values from the map
-     * @param {{ [string]: string }} inputMap The map of name - value for all the page's inputs
+     * Returns the hashcode for this page
      */
-    const applyPageInputs = async (name) => {
-        // TODO get inputMap from named save
-        const inputMap = {};
+    const getHashCode = () => {
+        // get all the inputs on the page
+        const inputs = Array.from(document.querySelectorAll('input'));
+        const inputNames = inputs.map(input => input.name).join('');
+        const inputNamesHashCode = hashCode(inputNames);
+        return inputNamesHashCode;
+    }
+
+    /**
+     * Applies the given name-value pairs for inputs to the page
+     * @param { Array<{ name: string, value: string }> } inputs The array of inputs to apply
+     */
+    const applyPageInputs = async (inputValues) => {
+        // create map for lookup
+        const inputMap = inputValues.reduce((acc, curr) => {
+            acc[curr.name] = curr.value;
+        }, {});
 
         const inputs = document.querySelectorAll('input');
 
@@ -58,49 +68,37 @@
     };
 
     /**
-     * Searches the document for all the inputs and saves their values
-     * @param { string } name The name to save the input state under
-     */
-    const savePageInputs = async (name) => {
-        const {
-            inputNamesHashCode,
-            inputNames,
-        } = scanPageForInputs();
-
-        // TODO save this somewhere
-        // under name => { hash, inputMap }
-    };
-
-    /**
      * Searches for the saved inputs for this page
      * @return { Array<{ name: string, value: string }> } The list of name-value pairs 
      */
-    const getSavedPageInputs = async () => {
-        // TODO read from saved place
-        return [];
+    const getPageInputsAndValues = () => {
+        const inputs = Array.from(document.querySelectorAll('input'));
+        return inputs.map(input => {
+            return {
+                name: input.name,
+                value: input.value,
+            };
+        });
     };
 
     // hook up event listeners
     runtime.onMessage.addListener((message, sender, sendResponse) => {
         switch (message.type) {
-            case 'GET_SAVED_PAGE_INPUTS': {
-                getSavedPageInputs().then(response => {
-                    sendResponse(response);
-                });
-                break;
-            }
-            case 'SAVE_PAGE_INPUTS': {
-                const name = message.payload;
-                savePageInputs(name).then(response => {
-                    sendResponse(response);
-                })
+            case 'GET_PAGE_INPUTS_AND_VALUES': {
+                const pageInputsAndValues = getPageInputsAndValues()
+                sendResponse(pageInputsAndValues);
                 break;
             }
             case 'APPLY_PAGE_INPUTS': {
-                const name = message.payload;
-                applyPageInputs(name).then(response => {
+                const inputValues = message.payload;
+                applyPageInputs(inputValues).then(response => {
                     sendResponse(response);
                 })
+                break;
+            }
+            case 'GET_HASHCODE': {
+                const hashCode = getHashCode();   
+                sendResponse(hashCode);
                 break;
             }
             default: {

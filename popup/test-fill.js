@@ -1,13 +1,79 @@
-let runtime
-try {
-    runtime = browser.runtime;
-}
-catch (error) {
-    runtime = chrome.runtime;
+/***** STORAGE *****/
+class Store {
+    static get storage() {
+        let _storage;
+        try {
+            if (storage) {
+                _storage = storage;
+            }
+        }
+        catch (error) {
+            _storage = chrome.storage;
+        }
+        finally {
+            return _storage;
+        }
+    }
+
+    constructor() {
+
+    }
+
+    /**
+     * Saves the input name-value pairs under the given name
+     * @param { string } hashCode
+     * @param { string } name 
+     * @param { Promise<Array<{ name: string, value: string }>> } inputs 
+     */
+    async savePageInputs(hashCode, name, inputs) {
+        // get everything in storage already
+        const savedPageInputs = await this.getSavedPageInputs(hashCode);
+        savedPageInputs[name] = inputs;
+        return new Promise((resolve, reject) => {
+            Store.storage.local.set({ [hashCode]: savedPageInputs }, () => {
+                if (Service.runtime.lastError) {
+                    reject(Service.runtime.lastError);
+                }
+                else {
+                    resolve(savedPageInputs);
+                }
+            });
+        });
+    }
+
+    /**
+     * Gets the saved input name-value pairs
+     * @param { Promise<{ [name: string]: Array<{ name: string, value: string }> }> } hashCode
+     */
+    async getSavedPageInputs(hashCode) {
+        new Promise((resolve, reject) => {
+            Store.storage.local.get(hashCode, (item) => {
+                if (Service.runtime.lastError) {
+                    reject(Service.runtime.lastError);
+                }
+                else {
+                    resolve(item || {});
+                }
+            });
+        });
+    }
 }
 
 /***** SERVICE *****/
 class Service {
+    static get runtime() {
+        let _runtime;
+        try {
+            _runtime = browser.runtime;
+        }
+        catch (error) {
+            _runtime = chrome.runtime;
+        }
+        finally {
+            return _runtime;
+        }
+    }
+
     constructor() {
 
     }
@@ -16,7 +82,7 @@ class Service {
         const message = { type, payload };
         return new Promise((resolve, reject) => {
             try {
-                runtime.sendMessage(message, response => {
+                Service.runtime.sendMessage(message, response => {
                     resolve(response);
                 })
             }
@@ -26,19 +92,29 @@ class Service {
         });
     }
 
-    async getSavedPageInputs() {
-        const type = 'GET_SAVED_PAGE_INPUTS';
+    /**
+     * @return { Promise<string> }
+     */
+    async getHashCode() {
+        const type = 'GET_HASHCODE';
         return this.sendMessage(type);
     }
 
-    async savePageInputs(name) {
-        const type = 'SAVE_PAGE_INPUTS';
-        return this.sendMessage(type, name);
+    /**
+     * @return { Promise<Array<{name: string, value: string}>> }
+     */
+    async getPageInputsAndValues() {
+        const type = 'GET_PAGE_INPUTS_AND_VALUES';
+        return this.sendMessage(type);
     }
 
-    async applyPageInputs(name) {
+    /**
+     * @param { Array<{ name: string, value: string }> } inputs The array of inputs to apply
+     * @return { Promise<void> }
+     */
+    async applyPageInputs(inputValues) {
         const type = 'APPLY_PAGE_INPUTS';
-        return this.sendMessage(type, name);
+        return this.sendMessage(type, inputValues);
     }
 }
 
@@ -64,6 +140,7 @@ class PopupDocumentController {
 
     constructor() {
         this.service = new Service();
+        this.storage = new Store();
         this.hasInit = false;
     }
 
@@ -81,7 +158,10 @@ class PopupDocumentController {
 
         let savedPageInputs = [];
         try {
-            savedPageInputs = await this.service.getSavedPageInputs() || [];
+            // get the hashCode of the page
+            const hashCode = await this.service.getHashCode();
+            // load stored items
+            savedPageInputs = (await this.storage.getSavedPageInputs(hashCode)) || [];
         }
         catch (error) {
             // TODO show error message
@@ -116,12 +196,21 @@ class PopupDocumentController {
         saveNameInput.addEventListener('keyup', () => this.update());
 
         // add apply name change
-        applyInputSelect.addEventListener('change', () => this.update());
+        applyInputSelect.addEventListener('mouseup', () => this.update());
 
         // add save button press
         saveNameButton.addEventListener('click', () => {
             try {
-                this.service.savePageInputs(this.saveNameInput.value);
+                Promise.all([
+                    this.service.getHashCode(),
+                    this.service.getPageInputsAndValues(),
+                ]).then(([hashCode, inputs]) => {
+                    const name = this.saveNameInput.value;
+                    this.storage.savePageInputs(hashCode, name, inputs);
+                }).catch(error => {
+                    // TODO show error message
+                    console.error(error);
+                }); 
             }
             catch (error) {
                 // TODO show error message
@@ -143,7 +232,7 @@ class PopupDocumentController {
 
     update() {
         const saveNameInput = this.saveNameInput;
-        const saveNameButton = this.savePageButton;
+        const saveNameButton = this.saveNameButton;
 
         const applyInputSelect = this.applyInputSelect;
         const applyInputButton = this.applyInputButton;
@@ -169,4 +258,6 @@ class PopupDocumentController {
 // run on load
 console.log('POPUP');
 const popupDocumentController = new PopupDocumentController();
-popupDocumentController.init();
+popupDocumentController.init().then(() => {
+    popupDocumentController.update();
+});
