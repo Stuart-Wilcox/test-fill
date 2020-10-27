@@ -52,7 +52,7 @@
         const inputs = Array.from(document.querySelectorAll('input'));
         const inputNames = inputs.map(input => input.name).join('');
         const inputNamesHashCode = hashCode(inputNames);
-        return inputNamesHashCode;
+        return `${inputNamesHashCode}`;
     }
 
     /**
@@ -91,6 +91,7 @@
 
     // hook up event listeners
     runtime.onMessage.addListener((message, sender, sendResponse) => {
+        console.log('Message received', message, sender);
         switch (message.type) {
             case 'GET_PAGE_INPUTS_AND_VALUES': {
                 const pageInputsAndValues = getPageInputsAndValues()

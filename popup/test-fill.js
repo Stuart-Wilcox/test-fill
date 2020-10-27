@@ -1,3 +1,5 @@
+(function(){
+
 /***** TABS *****/
 class Tabs {
     static get tabs() {
@@ -27,6 +29,20 @@ class Tabs {
                 }
                 else {
                     reject(new Error('Tab matching query not found'));
+                }
+            });
+        });
+    }
+
+    static async executeScript(script) {
+        const tab = await Tabs.getCurrentTab();
+        return new Promise((resolve, reject) => {
+            Tabs.tabs.executeScript(tab.id, script, (results) => {
+                if (Service.runtime.lastError) {
+                    reject(Service.runtime.lastError);
+                }
+                else {
+                    resolve(results);
                 }
             });
         });
@@ -61,11 +77,17 @@ class Store {
      * @param { Promise<Array<{ name: string, value: string }>> } inputs 
      */
     async savePageInputs(hashCode, name, inputs) {
+        console.log('Saving page inputs', hashCode, name, inputs);
+
         // get everything in storage already
+        console.log('Retrieving current page inputs')
         const savedPageInputs = (await this.getSavedPageInputs(hashCode)) || {};
+        console.log('Retrieved results', savedPageInputs);
         savedPageInputs[name] = inputs;
+        console.log('Setting result', savedPageInputs);
         return new Promise((resolve, reject) => {
             Store.storage.local.set({ [hashCode]: savedPageInputs }, () => {
+                console.log('Saved result');
                 if (Service.runtime.lastError) {
                     reject(Service.runtime.lastError);
                 }
@@ -81,8 +103,10 @@ class Store {
      * @param { Promise<{ [name: string]: Array<{ name: string, value: string }> }> } hashCode
      */
     async getSavedPageInputs(hashCode) {
+        console.log('Getting saved page inputs for ', hashCode);
         new Promise((resolve, reject) => {
             Store.storage.local.get(`${hashCode}`, (item) => {
+                console.log('Retrieved saved page inputs', item);
                 if (Service.runtime.lastError) {
                     reject(Service.runtime.lastError);
                 }
@@ -118,7 +142,9 @@ class Service {
         return new Promise(async (resolve, reject) => {
             try {
                 const tab = await Tabs.getCurrentTab();
+                console.log('Seding message', message);
                 Tabs.tabs.sendMessage(tab.id, message, response => {
+                    console.log('Response received', response);
                     if (Service.runtime.lastError) {
                         reject(Service.runtime.lastError);
                     }
@@ -163,20 +189,20 @@ class Service {
 
 /***** DOCUMENT CONTROLS *****/
 class PopupDocumentController {
-    get saveNameInput() {
-        return document.querySelector('#saveNameInput');
+    getSaveNameInput() {
+        return window.document.querySelector('#saveNameInput');
     }
 
-    get saveNameButton() {
-        return document.querySelector('#saveNameButton');
+    getSaveNameButton() {
+        return window.document.querySelector('#saveNameButton');
     }
 
-    get applyInputSelect() {
-        return document.querySelector('#applyInputSelect');
+    getApplyInputSelect() {
+        return window.document.querySelector('#applyInputSelect');
     }
 
-    get applyInputButton() {
-        return document.querySelector('#applyInputButton');
+    getApplyInputButton() {
+        return window.document.querySelector('#applyInputButton');
     }
 
     constructor() {
@@ -195,29 +221,24 @@ class PopupDocumentController {
         // execute the content script in the browser tab
         // wait until execution complete before we continue
         try {
-            await Tabs.tabs.executeScript({ file: 'content-scripts/test-fill.js' });
+            await Tabs.executeScript({ file: '../content-scripts/test-fill.js' });
         }
         catch (error) {
             console.log('Failed to execute content script');
             console.error(error);
         }
-        finally {
-            if (Service.runtime.lastError) {
-                console.log(Service.runtime.lastError);
-            }
-        }
 
-        const saveNameInput = this.saveNameInput;
-        const saveNameButton = this.saveNameButton;
-        const applyInputSelect = this.applyInputSelect;
-        const applyInputButton = this.applyInputButton;
+        const saveNameInput = this.getSaveNameInput();
+        const saveNameButton = this.getSaveNameButton();
+        const applyInputSelect = this.getApplyInputSelect();
+        const applyInputButton = this.getApplyInputButton();
 
         let savedPageInputs = [];
         try {
             // get the hashCode of the page
             const hashCode = await this.service.getHashCode();
             // load stored items
-            savedPageInputs = (await this.storage.getSavedPageInputs(hashCode)) || [];
+            savedPageInputs = (await this.storage.getSavedPageInputs(`${hashCode}`)) || [];
         }
         catch (error) {
             // TODO show error message
@@ -261,8 +282,8 @@ class PopupDocumentController {
                     this.service.getHashCode(),
                     this.service.getPageInputsAndValues(),
                 ]).then(([hashCode, inputs]) => {
-                    const name = this.saveNameInput.value;
-                    this.storage.savePageInputs(hashCode, name, inputs);
+                    const name = this.getSaveNameInput().value;
+                    this.storage.savePageInputs(`${hashCode}`, name, inputs);
                 }).catch(error => {
                     // TODO show error message
                     console.error(error);
@@ -277,7 +298,7 @@ class PopupDocumentController {
         // add apply button press
         applyInputButton.addEventListener('click', () => {
             try {
-                this.service.applyPageInputs(this.applyInputSelect.value);
+                this.service.applyPageInputs(this.getApplyInputSelect().value);
             }
             catch (error) {
                 // TODO show error message
@@ -287,11 +308,11 @@ class PopupDocumentController {
     }
 
     update() {
-        const saveNameInput = this.saveNameInput;
-        const saveNameButton = this.saveNameButton;
+        const saveNameInput = this.getSaveNameInput();
+        const saveNameButton = this.getSaveNameButton();
 
-        const applyInputSelect = this.applyInputSelect;
-        const applyInputButton = this.applyInputButton;
+        const applyInputSelect = this.getApplyInputSelect();
+        const applyInputButton = this.getApplyInputButton();
 
         // disable the save button if the name input is empty
         if (!saveNameInput.value) {
@@ -317,3 +338,5 @@ const popupDocumentController = new PopupDocumentController();
 popupDocumentController.init().then(() => {
     popupDocumentController.update();
 });
+
+})();
