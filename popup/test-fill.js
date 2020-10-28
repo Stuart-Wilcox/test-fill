@@ -197,12 +197,58 @@ class PopupDocumentController {
         return window.document.querySelector('#saveNameButton');
     }
 
+    getSaveOutput() {
+        return window.document.querySelector('#saveOutput');
+    }
+
     getApplyInputSelect() {
         return window.document.querySelector('#applyInputSelect');
     }
 
     getApplyInputButton() {
         return window.document.querySelector('#applyInputButton');
+    }
+
+    getApplyOutput() {
+        return window.document.querySelector('#applyOutput');
+    }
+
+    getOverallOutput() {
+        return window.document.querySelector('#overallOutput');
+    }
+
+    getErrorOutput() {
+        return window.document.querySelector('#errorOutput');
+    }
+
+    setSaveOutput(output) {
+        const saveOutput = this.getSaveOutput();
+        saveOutput.innerHTML = output;
+    }
+
+    setApplyOutput(output) {
+        const applyOutput = this.getApplyOutput();
+        applyOutput.innerHTML = output;
+    }
+
+    setOverallOutput(output, clearErrorOutput=true) {
+        const overallOutput = this.getOverallOutput();
+        overallOutput.innerHTML = output;
+
+        // clear any errors if needed
+        if (clearErrorOutput) {
+            this.setErrorOutput('', false);
+        }
+    }
+
+    setErrorOutput(output, clearOverallOutput=true) {
+        const errorOutput = this.getErrorOutput();
+        errorOutput.innerHTML = output;
+
+        // clear overall if needed
+        if (clearOverallOutput) {
+            this.setOverallOutput('', false);
+        }
     }
 
     constructor() {
@@ -214,9 +260,10 @@ class PopupDocumentController {
     async init() {
         // only run once
         if (this.hasInit) {
-            return;
+            return false;
         }
         this.hasInit = true;
+        this.setOverallOutput('Intializing...');
 
         // execute the content script in the browser tab
         // wait until execution complete before we continue
@@ -224,8 +271,9 @@ class PopupDocumentController {
             await Tabs.executeScript({ file: '../content-scripts/test-fill.js' });
         }
         catch (error) {
-            console.log('Failed to execute content script');
+            this.setErrorOutput('Failed to execute content script');
             console.error(error);
+            return false;
         }
 
         const saveNameInput = this.getSaveNameInput();
@@ -241,9 +289,10 @@ class PopupDocumentController {
             savedPageInputs = (await this.storage.getSavedPageInputs(`${hashCode}`)) || [];
         }
         catch (error) {
-            // TODO show error message
+            this.setErrorOutput('Failed to fetch page unique identifier');
             console.error(error);
             savedPageInputs = [];
+            return false;
         }
 
         // fill in the options for the select
@@ -283,14 +332,20 @@ class PopupDocumentController {
                     this.service.getPageInputsAndValues(),
                 ]).then(([hashCode, inputs]) => {
                     const name = this.getSaveNameInput().value;
-                    this.storage.savePageInputs(`${hashCode}`, name, inputs);
+                    return this.storage.savePageInputs(`${hashCode}`, name, inputs);
+                }).then(() => {
+                    // clear the input & disabled the button
+                    this.getSaveNameInput().value = '';
+                    this.getSaveNameButton().disabled = true;
+
+                    this.setSaveOutput('Successfully saved inputs')
                 }).catch(error => {
-                    // TODO show error message
+                    this.setErrorOutput('An error occurred while saving');
                     console.error(error);
                 }); 
             }
             catch (error) {
-                // TODO show error message
+                this.setErrorOutput('An error occured while trying to save');
                 console.error(error);
             }
         });
@@ -298,13 +353,26 @@ class PopupDocumentController {
         // add apply button press
         applyInputButton.addEventListener('click', () => {
             try {
-                this.service.applyPageInputs(this.getApplyInputSelect().value);
+                const value = this.getApplyInputSelect().value
+                this.service.applyPageInputs(value).then(() => {
+                    this.setApplyOutput('Successfully applied inputs');
+                });
             }
             catch (error) {
-                // TODO show error message
+                this.setErrorOutput('An error occurred while applying');
                 console.error(error);
             }
         });
+
+        // set complete message
+        this.setOverallOutput('Initialized');
+
+        // clear message after 2 seconds
+        window.setTimeout(() => {
+            this.setOverallOutput('');
+        }, 2000);
+
+        return true;
     }
 
     update() {
@@ -329,14 +397,24 @@ class PopupDocumentController {
         else {
             applyInputButton.disabled = false;
         }
+
+        // clear any messages
+        this.setSaveOutput('');
+        this.setApplyOutput('');
+        this.setOverallOutput('');
+        this.setErrorOutput('');
     }
 }
 
 // run on load
 console.log('POPUP');
 const popupDocumentController = new PopupDocumentController();
-popupDocumentController.init().then(() => {
-    popupDocumentController.update();
+popupDocumentController.init().then((success) => {
+    if (success) {
+        popupDocumentController.update();
+    }
+}).catch((error) => {
+    console.error(error);
 });
 
 })();
