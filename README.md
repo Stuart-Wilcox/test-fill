@@ -19,4 +19,6 @@ In Firefox, go to [about:debugging](about:debugging#/runtime/this-firefox) and s
 The extension should now be available to run and debug in the browser.
 
 ## Chrome
-TODO
+Navigate to [chrome://extensions/](chrome://extensions/) and select Load Unpacked, which should prompt you to open a folder. Select the test-fill root folder and then the extension should be available.
+
+Note that Chrome will produce an error immediately, which will say "Unrecognized manifest key 'browser_specific_settings'". This can be safely ignored, as it is a field that only Firefox recognizes and should be ignored by other browsers.
