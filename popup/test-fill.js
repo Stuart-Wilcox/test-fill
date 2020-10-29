@@ -213,31 +213,31 @@ class PopupDocumentController {
 
     setSaveOutput(output, duration=3000) {
         const saveOutput = this.getSaveOutput();
-        saveOutput.innerHTML = output;
+        saveOutput.innerText = output;
 
         // clear the output after duration
         if (duration) {
             window.setTimeout(() => {
-                saveOutput.innerHTML = '';                
+                saveOutput.innerText = '';                
             }, duration);
         }
     }
 
     setApplyOutput(output, duration=3000) {
         const applyOutput = this.getApplyOutput();
-        applyOutput.innerHTML = output;
+        applyOutput.innerText = output;
 
         // clear the output after duration
         if (duration) {
             window.setTimeout(() => {
-                applyOutput.innerHTML = '';                
+                applyOutput.innerText = '';                
             }, duration);
         }        
     }
 
     setOverallOutput(output, clearErrorOutput=true, duration=3000) {
         const overallOutput = this.getOverallOutput();
-        overallOutput.innerHTML = output;
+        overallOutput.innerText = output;
 
         // clear any errors if needed
         if (clearErrorOutput) {
@@ -247,7 +247,7 @@ class PopupDocumentController {
         // clear the output after duration
         if (duration) {
             window.setTimeout(() => {
-                overallOutput.innerHTML = '';                
+                overallOutput.innerText = '';                
             }, duration);
         }
 
@@ -255,7 +255,7 @@ class PopupDocumentController {
 
     setErrorOutput(output, clearOverallOutput=true, duration=3000) {
         const errorOutput = this.getErrorOutput();
-        errorOutput.innerHTML = output;
+        errorOutput.innerText = output;
 
         // clear overall if needed
         if (clearOverallOutput) {
@@ -265,7 +265,7 @@ class PopupDocumentController {
         // clear the output after duration
         if (duration) {
             window.setTimeout(() => {
-                errorOutput.innerHTML = '';                
+                errorOutput.innerText = '';                
             }, duration);
         }
 

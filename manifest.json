@@ -4,7 +4,8 @@
     "version": "1.0",
     "description": "Adds test fill data",
     "icons": {
-        "48": "icons/icon.png"
+        "48": "icons/TFV2_48.png",
+        "96": "icons/TFV2_96.png"
     },
     "content_scripts": [
         {
