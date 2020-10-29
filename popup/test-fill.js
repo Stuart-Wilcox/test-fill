@@ -77,17 +77,11 @@ class Store {
      * @param { Promise<Array<{ name: string, value: string }>> } inputs 
      */
     async savePageInputs(hashCode, name, inputs) {
-        console.log('Saving page inputs', hashCode, name, inputs);
-
         // get everything in storage already
-        console.log('Retrieving current page inputs')
         const savedPageInputs = (await this.getSavedPageInputs(hashCode)) || {};
-        console.log('Retrieved results', savedPageInputs);
         savedPageInputs[name] = inputs;
-        console.log('Setting result', savedPageInputs);
         return new Promise((resolve, reject) => {
             Store.storage.local.set({ [hashCode]: savedPageInputs }, () => {
-                console.log('Saved result');
                 if (Service.runtime.lastError) {
                     reject(Service.runtime.lastError);
                 }
@@ -103,15 +97,13 @@ class Store {
      * @param { Promise<{ [name: string]: Array<{ name: string, value: string }> }> } hashCode
      */
     async getSavedPageInputs(hashCode) {
-        console.log('Getting saved page inputs for ', hashCode);
-        new Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             Store.storage.local.get(`${hashCode}`, (item) => {
-                console.log('Retrieved saved page inputs', item);
                 if (Service.runtime.lastError) {
                     reject(Service.runtime.lastError);
                 }
                 else {
-                    resolve(item);
+                    resolve(item[hashCode]);
                 }
             });
         });
@@ -142,9 +134,7 @@ class Service {
         return new Promise(async (resolve, reject) => {
             try {
                 const tab = await Tabs.getCurrentTab();
-                console.log('Seding message', message);
                 Tabs.tabs.sendMessage(tab.id, message, response => {
-                    console.log('Response received', response);
                     if (Service.runtime.lastError) {
                         reject(Service.runtime.lastError);
                     }
@@ -221,17 +211,31 @@ class PopupDocumentController {
         return window.document.querySelector('#errorOutput');
     }
 
-    setSaveOutput(output) {
+    setSaveOutput(output, duration=3000) {
         const saveOutput = this.getSaveOutput();
         saveOutput.innerHTML = output;
+
+        // clear the output after duration
+        if (duration) {
+            window.setTimeout(() => {
+                saveOutput.innerHTML = '';                
+            }, duration);
+        }
     }
 
-    setApplyOutput(output) {
+    setApplyOutput(output, duration=3000) {
         const applyOutput = this.getApplyOutput();
         applyOutput.innerHTML = output;
+
+        // clear the output after duration
+        if (duration) {
+            window.setTimeout(() => {
+                applyOutput.innerHTML = '';                
+            }, duration);
+        }        
     }
 
-    setOverallOutput(output, clearErrorOutput=true) {
+    setOverallOutput(output, clearErrorOutput=true, duration=3000) {
         const overallOutput = this.getOverallOutput();
         overallOutput.innerHTML = output;
 
@@ -239,9 +243,17 @@ class PopupDocumentController {
         if (clearErrorOutput) {
             this.setErrorOutput('', false);
         }
+
+        // clear the output after duration
+        if (duration) {
+            window.setTimeout(() => {
+                overallOutput.innerHTML = '';                
+            }, duration);
+        }
+
     }
 
-    setErrorOutput(output, clearOverallOutput=true) {
+    setErrorOutput(output, clearOverallOutput=true, duration=3000) {
         const errorOutput = this.getErrorOutput();
         errorOutput.innerHTML = output;
 
@@ -249,6 +261,14 @@ class PopupDocumentController {
         if (clearOverallOutput) {
             this.setOverallOutput('', false);
         }
+
+        // clear the output after duration
+        if (duration) {
+            window.setTimeout(() => {
+                errorOutput.innerHTML = '';                
+            }, duration);
+        }
+
     }
 
     constructor() {
@@ -281,42 +301,7 @@ class PopupDocumentController {
         const applyInputSelect = this.getApplyInputSelect();
         const applyInputButton = this.getApplyInputButton();
 
-        let savedPageInputs = [];
-        try {
-            // get the hashCode of the page
-            const hashCode = await this.service.getHashCode();
-            // load stored items
-            savedPageInputs = (await this.storage.getSavedPageInputs(`${hashCode}`)) || [];
-        }
-        catch (error) {
-            this.setErrorOutput('Failed to fetch page unique identifier');
-            console.error(error);
-            savedPageInputs = [];
-            return false;
-        }
-
-        // fill in the options for the select
-        const savedInputSelectOptions = savedPageInputs.map(({ name, value }) => {
-            const option = document.createElement('option');
-            option.setAttribute('value', value);
-            option.innerText = name;
-            return option;
-        });
-        // create placeholder element
-        const placeholderElement = document.createElement('option');
-        placeholderElement.setAttribute('value', '');
-        placeholderElement.innerText = 'Select an option'
-        savedInputSelectOptions.unshift(placeholderElement);
-
-        // remove all existing options
-        Array.from(applyInputSelect.children).forEach(child => {
-            applyInputSelect.removeChild(child);
-        });
-
-        // add each option to the select
-        savedInputSelectOptions.forEach(option => {
-            applyInputSelect.appendChild(option);
-        });
+        await this.updateApplySelectOptions();
 
         // add save name change
         saveNameInput.addEventListener('keyup', () => this.update());
@@ -338,7 +323,8 @@ class PopupDocumentController {
                     this.getSaveNameInput().value = '';
                     this.getSaveNameButton().disabled = true;
 
-                    this.setSaveOutput('Successfully saved inputs')
+                    this.setSaveOutput('Successfully saved inputs');
+                    return this.updateApplySelectOptions();
                 }).catch(error => {
                     this.setErrorOutput('An error occurred while saving');
                     console.error(error);
@@ -352,16 +338,19 @@ class PopupDocumentController {
 
         // add apply button press
         applyInputButton.addEventListener('click', () => {
-            try {
-                const value = this.getApplyInputSelect().value
-                this.service.applyPageInputs(value).then(() => {
-                    this.setApplyOutput('Successfully applied inputs');
-                });
-            }
-            catch (error) {
+            const value = this.getApplyInputSelect().value;
+            this.service.getHashCode().then(hashCode => {
+                return this.storage.getSavedPageInputs(hashCode);
+            }).then(savedPageInputsMap => {
+                // select the chosen save name
+                const savedPageInputs = savedPageInputsMap[value];
+                return this.service.applyPageInputs(savedPageInputs);
+            }).then(() => {
+                this.setApplyOutput('Successfully applied inputs');
+            }).catch(error => {
                 this.setErrorOutput('An error occurred while applying');
-                console.error(error);
-            }
+                console.error(error);    
+            });
         });
 
         // set complete message
@@ -373,6 +362,47 @@ class PopupDocumentController {
         }, 2000);
 
         return true;
+    }
+
+    async updateApplySelectOptions() {
+        const applyInputSelect = this.getApplyInputSelect();
+        let savedPageInputs = [];
+        try {
+            // get the hashCode of the page
+            const hashCode = await this.service.getHashCode();
+            // load stored items
+            savedPageInputs = (await this.storage.getSavedPageInputs(`${hashCode}`)) || [];
+        }
+        catch (error) {
+            this.setErrorOutput('Failed to fetch page unique identifier');
+            console.error(error);
+            savedPageInputs = [];
+            return false;
+        }
+
+        // fill in the options for the select
+        const savedInputSelectOptions = Object.keys(savedPageInputs).map((name) => {
+            const option = document.createElement('option');
+            option.setAttribute('value', name);
+            option.innerText = name;
+            return option;
+        });
+
+        // create placeholder element
+        const placeholderElement = document.createElement('option');
+        placeholderElement.setAttribute('value', '');
+        placeholderElement.innerText = 'Select an option'
+        savedInputSelectOptions.unshift(placeholderElement);
+
+        // remove all existing options
+        Array.from(applyInputSelect.children).forEach(child => {
+            applyInputSelect.removeChild(child);
+        });
+
+        // add each option to the select
+        savedInputSelectOptions.forEach(option => {
+            applyInputSelect.appendChild(option);
+        });
     }
 
     update() {
@@ -407,7 +437,7 @@ class PopupDocumentController {
 }
 
 // run on load
-console.log('POPUP');
+console.log('Running Test-Fill (V2)');
 const popupDocumentController = new PopupDocumentController();
 popupDocumentController.init().then((success) => {
     if (success) {

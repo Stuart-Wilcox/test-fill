@@ -3,6 +3,9 @@
     "name": "Test Fill (V2)",
     "version": "1.0",
     "description": "Adds test fill data",
+    "icons": {
+        "48": "icons/icon.png"
+    },
     "content_scripts": [
         {
             "matches": [

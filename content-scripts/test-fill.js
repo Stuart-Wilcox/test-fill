@@ -1,7 +1,13 @@
 // wrap in function to avoid
 // altering surrounding context
 (function() {
-    console.log('CONTENT SCRIPT')
+    // only run once
+    if (window.__hasTestFillInit) {
+        return;
+    }
+    window.__hasTestFillInit = true;
+
+    console.log('Running Test-Fill (V2)');
 
     let runtime;
     try {
@@ -63,6 +69,7 @@
         // create map for lookup
         const inputMap = inputValues.reduce((acc, curr) => {
             acc[curr.name] = curr.value;
+            return acc;
         }, {});
 
         const inputs = document.querySelectorAll('input');
@@ -91,7 +98,7 @@
 
     // hook up event listeners
     runtime.onMessage.addListener((message, sender, sendResponse) => {
-        console.log('Message received', message, sender);
+        // console.log('Message received', message, sender);
         switch (message.type) {
             case 'GET_PAGE_INPUTS_AND_VALUES': {
                 const pageInputsAndValues = getPageInputsAndValues()
@@ -101,8 +108,13 @@
             case 'APPLY_PAGE_INPUTS': {
                 const inputValues = message.payload;
                 applyPageInputs(inputValues).then(response => {
+                    if (runtime.lastError) {
+                        console.error(runtime.lastError);
+                    }
                     sendResponse(response);
-                })
+                }).catch(error => {
+                    console.warn(error);
+                });
                 break;
             }
             case 'GET_HASHCODE': {
