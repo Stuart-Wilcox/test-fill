@@ -1,5 +1,9 @@
 # Test-Fill
 
+[Firefox Addon](https://addons.mozilla.org/en-US/firefox/addon/test-fill-v2/)
+
+![/assets/Popup.png](/assets/Popup.png)
+
 Test-fill is a browser extension that facilitates filling in web forms with the same data over and over
 
 It is intended as a QA tool, but could also be used for general productivity for speeding up form submissions in certain cases.
