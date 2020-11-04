@@ -96,6 +96,14 @@
         });
     };
 
+    /**
+     * Gets the current page url
+     * @return { string }
+     */
+    const getCurrentPageUrl = () => {
+       return window.location.href; 
+    };
+
     // hook up event listeners
     runtime.onMessage.addListener((message, sender, sendResponse) => {
         // console.log('Message received', message, sender);
@@ -120,6 +128,11 @@
             case 'GET_HASHCODE': {
                 const hashCode = getHashCode();   
                 sendResponse(hashCode);
+                break;
+            }
+            case 'GET_PAGE_URL': {
+                const pageUrl = getCurrentPageUrl();
+                sendResponse(pageUrl);
                 break;
             }
             default: {

@@ -108,6 +108,32 @@ class Store {
             });
         });
     }
+
+    async getUserSelectedPageIdentifier() {
+        return new Promise((resolve, reject) => {
+            Store.storage.local.get('userSelectedPageIdentifier', item => {
+                if (Service.runtime.lastError) {
+                    reject(Service.runtime.lastError);
+                }
+                else {
+                    resolve(item['userSelectedPageIdentifier'] || 'pageId');
+                }
+            });
+        });
+    }
+
+    async setUserSelectedPageIdentifier(userSelectedPageIdentifier='pageId') {
+        return new Promise((resolve, reject) => {
+            Store.storage.local.set({ userSelectedPageIdentifier }, () => {
+                if (Service.runtime.lastError) {
+                    reject(Service.runtime.lastError);
+                }
+                else {
+                    resolve(userSelectedPageIdentifier);
+                }
+            });
+        });
+    }
 }
 
 /***** SERVICE *****/
@@ -173,6 +199,14 @@ class Service {
         const type = 'APPLY_PAGE_INPUTS';
         return this.sendMessage(type, inputValues);
     }
+
+    /**
+     * @return { Promise<string> }
+     */
+    async getPageUrl() {
+        const type = 'GET_PAGE_URL';
+        return this.sendMessage(type);
+    }
 }
 
 
@@ -209,6 +243,17 @@ class PopupDocumentController {
 
     getErrorOutput() {
         return window.document.querySelector('#errorOutput');
+    }
+
+    getPageIdOutput() {
+        return window.document.querySelector('#pageIdOutput');
+    }
+
+    getUserSelectedPageId() {
+        return [
+            window.document.querySelector('#pageIdOption'),
+            window.document.querySelector('#pageUrlOption'),
+        ];
     }
 
     setSaveOutput(output, duration=3000) {
@@ -271,6 +316,12 @@ class PopupDocumentController {
 
     }
 
+    setPageIdOutput(output, disabled=true) {
+        const pageIdOutput = this.getPageIdOutput();
+        pageIdOutput.value = output;
+        pageIdOutput.disabled = disabled;
+    }
+
     constructor() {
         this.service = new Service();
         this.storage = new Store();
@@ -300,8 +351,13 @@ class PopupDocumentController {
         const saveNameButton = this.getSaveNameButton();
         const applyInputSelect = this.getApplyInputSelect();
         const applyInputButton = this.getApplyInputButton();
+        const [
+            pageIdOption,
+            pageUrlOption,
+        ] = this.getUserSelectedPageId();
 
         await this.updateApplySelectOptions();
+        await this.updateCurrentPageIdentifier();
 
         // add save name change
         saveNameInput.addEventListener('keyup', () => this.update());
@@ -350,6 +406,26 @@ class PopupDocumentController {
             }).catch(error => {
                 this.setErrorOutput('An error occurred while applying');
                 console.error(error);    
+            });
+        });
+
+        pageIdOption.addEventListener('click', () => {
+            const value = 'pageId';
+            this.storage.setUserSelectedPageIdentifier(value).then(() => {
+                this.updateCurrentPageIdentifier();
+            }).catch(error => {
+                this.setErrorOutput('An error occurred while setting identifier');
+                console.error(error);
+            });
+        });
+
+        pageUrlOption.addEventListener('click', () => {
+            const value = 'pageUrl';
+            this.storage.setUserSelectedPageIdentifier(value).then(() => {
+                this.updateCurrentPageIdentifier();
+            }).catch(error => {
+                this.setErrorOutput('An error occurred while setting identifier');
+                console.error(error);
             });
         });
 
@@ -403,6 +479,33 @@ class PopupDocumentController {
         savedInputSelectOptions.forEach(option => {
             applyInputSelect.appendChild(option);
         });
+    }
+
+    async updateCurrentPageIdentifier() {
+        // get the preferred type
+        const userSelectedPageIdentifier = await this.storage.getUserSelectedPageIdentifier();   
+        
+        const [
+            pageIdOption,
+            pageUrlOption,
+        ] = this.getUserSelectedPageId();
+
+        if (userSelectedPageIdentifier === 'pageId') {
+            // get the hashCode
+            const hashCode = await this.service.getHashCode();
+            this.setPageIdOutput(`${hashCode}`);
+
+            pageIdOption.checked = true;
+            pageUrlOption.checked = false;
+        }
+        else {
+            // get the page url
+            const pageUrl = await this.service.getPageUrl();
+            this.setPageIdOutput(pageUrl, false);
+
+            pageIdOption.checked = false;
+            pageUrlOption.checked = true;
+        }
     }
 
     update() {

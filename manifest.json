@@ -10,9 +10,7 @@
     "content_scripts": [
         {
             "matches": [
-                "*://*.mozilla.org/*",
-                "http://*/*",
-                "https://*/*"
+                "*://*.mozilla.org/*"
             ],
             "js": [
                 "content-scripts/test-fill.js"

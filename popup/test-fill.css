@@ -33,6 +33,38 @@ select, select > * {
 }
 */
 
-#errorText {
+#errorOutput {
     color: red;
+}
+
+.row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.plain-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.plain-row > div {
+    margin-top: 4px;
+}
+
+.row > button {
+    margin-left: 10px;
+    width: 90px;
+}
+
+.row > input, .row > select {
+    width: 200px;
+}
+
+#pageIdOutput {
+    border: none;
+    background-color: #E1E1E1;
+    width: 300px;
+    padding: 5px;
 }
