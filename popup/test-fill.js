@@ -203,8 +203,8 @@ class Service {
     /**
      * @return { Promise<string> }
      */
-    async getPageUrl() {
-        const type = 'GET_PAGE_URL';
+    async getPageOrigin() {
+        const type = 'GET_PAGE_ORIGIN';
         return this.sendMessage(type);
     }
 }
@@ -252,7 +252,7 @@ class PopupDocumentController {
     getUserSelectedPageId() {
         return [
             window.document.querySelector('#pageIdOption'),
-            window.document.querySelector('#pageUrlOption'),
+            window.document.querySelector('#pageOriginOption'),
         ];
     }
 
@@ -353,7 +353,7 @@ class PopupDocumentController {
         const applyInputButton = this.getApplyInputButton();
         const [
             pageIdOption,
-            pageUrlOption,
+            pageOriginOption,
         ] = this.getUserSelectedPageId();
 
         await this.updateApplySelectOptions();
@@ -419,8 +419,8 @@ class PopupDocumentController {
             });
         });
 
-        pageUrlOption.addEventListener('click', () => {
-            const value = 'pageUrl';
+        pageOriginOption.addEventListener('click', () => {
+            const value = 'pageOrigin';
             this.storage.setUserSelectedPageIdentifier(value).then(() => {
                 this.updateCurrentPageIdentifier();
             }).catch(error => {
@@ -487,7 +487,7 @@ class PopupDocumentController {
         
         const [
             pageIdOption,
-            pageUrlOption,
+            pageOriginOption,
         ] = this.getUserSelectedPageId();
 
         if (userSelectedPageIdentifier === 'pageId') {
@@ -496,15 +496,15 @@ class PopupDocumentController {
             this.setPageIdOutput(`${hashCode}`);
 
             pageIdOption.checked = true;
-            pageUrlOption.checked = false;
+            pageOriginOption.checked = false;
         }
         else {
             // get the page url
-            const pageUrl = await this.service.getPageUrl();
-            this.setPageIdOutput(pageUrl, false);
+            const pageOrigin = await this.service.getPageOrigin();
+            this.setPageIdOutput(pageOrigin);
 
             pageIdOption.checked = false;
-            pageUrlOption.checked = true;
+            pageOriginOption.checked = true;
         }
     }
 

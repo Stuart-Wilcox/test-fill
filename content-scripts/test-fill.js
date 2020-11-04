@@ -100,8 +100,8 @@
      * Gets the current page url
      * @return { string }
      */
-    const getCurrentPageUrl = () => {
-       return window.location.href; 
+    const getCurrentPageOrigin = () => {
+        return window.location.origin; 
     };
 
     // hook up event listeners
@@ -130,9 +130,9 @@
                 sendResponse(hashCode);
                 break;
             }
-            case 'GET_PAGE_URL': {
-                const pageUrl = getCurrentPageUrl();
-                sendResponse(pageUrl);
+            case 'GET_PAGE_ORIGIN': {
+                const pageOrigin = getCurrentPageOrigin();
+                sendResponse(pageOrigin);
                 break;
             }
             default: {
