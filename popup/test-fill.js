@@ -72,21 +72,18 @@ class Store {
 
     /**
      * Saves the input name-value pairs under the given name
-     * @param { string } hashCode
      * @param { string } name 
      * @param { Promise<Array<{ name: string, value: string }>> } inputs 
      */
-    async savePageInputs(hashCode, name, inputs) {
+    async savePageInputs(name, inputs) {
         // get everything in storage already
-        const savedPageInputs = (await this.getSavedPageInputs(hashCode)) || {};
-        savedPageInputs[name] = inputs;
         return new Promise((resolve, reject) => {
-            Store.storage.local.set({ [hashCode]: savedPageInputs }, () => {
+            Store.storage.local.set({ [name]: inputs }, () => {
                 if (Service.runtime.lastError) {
                     reject(Service.runtime.lastError);
                 }
                 else {
-                    resolve(savedPageInputs);
+                    resolve(inputs);
                 }
             });
         });
@@ -96,40 +93,31 @@ class Store {
      * Gets the saved input name-value pairs
      * @param { Promise<{ [name: string]: Array<{ name: string, value: string }> }> } hashCode
      */
-    async getSavedPageInputs(hashCode) {
+    async getSavedPageInput(name) {
         return new Promise((resolve, reject) => {
-            Store.storage.local.get(`${hashCode}`, (item) => {
+            Store.storage.local.get(name, (item) => {
                 if (Service.runtime.lastError) {
                     reject(Service.runtime.lastError);
                 }
                 else {
-                    resolve(item[hashCode]);
+                    resolve(item[name]);
                 }
             });
         });
     }
 
-    async getUserSelectedPageIdentifier() {
+    /**
+     * Gets the saved input name-value pairs
+     * @param { Promise<{ [name: string]: Array<{ name: string, value: string }> }> } hashCode
+     */
+    async getAllSavedPageInputs() {
         return new Promise((resolve, reject) => {
-            Store.storage.local.get('userSelectedPageIdentifier', item => {
+            Store.storage.local.get(null, (item) => {
                 if (Service.runtime.lastError) {
                     reject(Service.runtime.lastError);
                 }
                 else {
-                    resolve(item['userSelectedPageIdentifier'] || 'pageId');
-                }
-            });
-        });
-    }
-
-    async setUserSelectedPageIdentifier(userSelectedPageIdentifier='pageId') {
-        return new Promise((resolve, reject) => {
-            Store.storage.local.set({ userSelectedPageIdentifier }, () => {
-                if (Service.runtime.lastError) {
-                    reject(Service.runtime.lastError);
-                }
-                else {
-                    resolve(userSelectedPageIdentifier);
+                    resolve(item);
                 }
             });
         });
@@ -176,14 +164,6 @@ class Service {
     }
 
     /**
-     * @return { Promise<string> }
-     */
-    async getHashCode() {
-        const type = 'GET_HASHCODE';
-        return this.sendMessage(type);
-    }
-
-    /**
      * @return { Promise<Array<{name: string, value: string}>> }
      */
     async getPageInputsAndValues() {
@@ -199,20 +179,16 @@ class Service {
         const type = 'APPLY_PAGE_INPUTS';
         return this.sendMessage(type, inputValues);
     }
-
-    /**
-     * @return { Promise<string> }
-     */
-    async getPageOrigin() {
-        const type = 'GET_PAGE_ORIGIN';
-        return this.sendMessage(type);
-    }
 }
 
 
 
 /***** DOCUMENT CONTROLS *****/
-class PopupDocumentController {
+
+/**
+ * Controls the UI elements on the page
+ */
+class PopupDocumentPage {
     getSaveNameInput() {
         return window.document.querySelector('#saveNameInput');
     }
@@ -243,17 +219,6 @@ class PopupDocumentController {
 
     getErrorOutput() {
         return window.document.querySelector('#errorOutput');
-    }
-
-    getPageIdOutput() {
-        return window.document.querySelector('#pageIdOutput');
-    }
-
-    getUserSelectedPageId() {
-        return [
-            window.document.querySelector('#pageIdOption'),
-            window.document.querySelector('#pageOriginOption'),
-        ];
     }
 
     setSaveOutput(output, duration=3000) {
@@ -315,14 +280,11 @@ class PopupDocumentController {
         }
 
     }
+}
 
-    setPageIdOutput(output, disabled=true) {
-        const pageIdOutput = this.getPageIdOutput();
-        pageIdOutput.value = output;
-        pageIdOutput.disabled = disabled;
-    }
-
+class PopupDocumentController {
     constructor() {
+        this.page = new PopupDocumentPage();
         this.service = new Service();
         this.storage = new Store();
         this.hasInit = false;
@@ -334,125 +296,130 @@ class PopupDocumentController {
             return false;
         }
         this.hasInit = true;
-        this.setOverallOutput('Intializing...');
+        this.page.setOverallOutput('Intializing...');
+
+        const saveNameInput = this.page.getSaveNameInput();
+        const saveNameButton = this.page.getSaveNameButton();
+        const applyInputSelect = this.page.getApplyInputSelect();
+        const applyInputButton = this.page.getApplyInputButton();
+        
+        // disable the buttons and inputs
+        saveNameInput.disabled = true;
+        saveNameButton.disabled = true;
+        applyInputSelect.disabled = true;
+        applyInputButton.disabled = true;
 
         // execute the content script in the browser tab
         // wait until execution complete before we continue
         try {
             await Tabs.executeScript({ file: '../content-scripts/test-fill.js' });
-        }
+        }    
         catch (error) {
-            this.setErrorOutput('Failed to execute content script');
+            this.page.setErrorOutput('Failed to execute content script');
             console.error(error);
             return false;
-        }
-
-        const saveNameInput = this.getSaveNameInput();
-        const saveNameButton = this.getSaveNameButton();
-        const applyInputSelect = this.getApplyInputSelect();
-        const applyInputButton = this.getApplyInputButton();
-        const [
-            pageIdOption,
-            pageOriginOption,
-        ] = this.getUserSelectedPageId();
-
-        await this.updateApplySelectOptions();
-        await this.updateCurrentPageIdentifier();
+        }    
 
         // add save name change
-        saveNameInput.addEventListener('keyup', () => this.update());
+        saveNameInput.addEventListener('keyup', () => this.handleSaveNameInputChanged());
 
         // add apply name change
-        applyInputSelect.addEventListener('mouseup', () => this.update());
+        applyInputSelect.addEventListener('mouseup', () => this.handleApplyInputChanged());
 
         // add save button press
-        saveNameButton.addEventListener('click', () => {
-            try {
-                Promise.all([
-                    this.service.getHashCode(),
-                    this.service.getPageInputsAndValues(),
-                ]).then(([hashCode, inputs]) => {
-                    const name = this.getSaveNameInput().value;
-                    return this.storage.savePageInputs(`${hashCode}`, name, inputs);
-                }).then(() => {
-                    // clear the input & disabled the button
-                    this.getSaveNameInput().value = '';
-                    this.getSaveNameButton().disabled = true;
-
-                    this.setSaveOutput('Successfully saved inputs');
-                    return this.updateApplySelectOptions();
-                }).catch(error => {
-                    this.setErrorOutput('An error occurred while saving');
-                    console.error(error);
-                }); 
-            }
-            catch (error) {
-                this.setErrorOutput('An error occured while trying to save');
-                console.error(error);
-            }
-        });
+        saveNameButton.addEventListener('click', () => this.handleSaveNameButtonClicked());
 
         // add apply button press
-        applyInputButton.addEventListener('click', () => {
-            const value = this.getApplyInputSelect().value;
-            this.service.getHashCode().then(hashCode => {
-                return this.storage.getSavedPageInputs(hashCode);
-            }).then(savedPageInputsMap => {
-                // select the chosen save name
-                const savedPageInputs = savedPageInputsMap[value];
-                return this.service.applyPageInputs(savedPageInputs);
-            }).then(() => {
-                this.setApplyOutput('Successfully applied inputs');
-            }).catch(error => {
-                this.setErrorOutput('An error occurred while applying');
-                console.error(error);    
-            });
-        });
+        applyInputButton.addEventListener('click', () => this.handleApplyInputButtonClicked());
 
-        pageIdOption.addEventListener('click', () => {
-            const value = 'pageId';
-            this.storage.setUserSelectedPageIdentifier(value).then(() => {
-                this.updateCurrentPageIdentifier();
-            }).catch(error => {
-                this.setErrorOutput('An error occurred while setting identifier');
-                console.error(error);
-            });
-        });
+        // re-enable the inputs
+        saveNameInput.disabled = false;
+        applyInputSelect.disabled = false;
 
-        pageOriginOption.addEventListener('click', () => {
-            const value = 'pageOrigin';
-            this.storage.setUserSelectedPageIdentifier(value).then(() => {
-                this.updateCurrentPageIdentifier();
-            }).catch(error => {
-                this.setErrorOutput('An error occurred while setting identifier');
-                console.error(error);
-            });
-        });
+        // re-run the update once content script has run
+        // and any additional setup has been complete
+        await this.updateApplySelectOptions();
+
 
         // set complete message
-        this.setOverallOutput('Initialized');
+        this.page.setOverallOutput('Initialized');
 
         // clear message after 2 seconds
         window.setTimeout(() => {
-            this.setOverallOutput('');
+            this.page.setOverallOutput('');
         }, 2000);
 
+        // successfully initialized
         return true;
     }
 
-    async updateApplySelectOptions() {
-        const applyInputSelect = this.getApplyInputSelect();
-        let savedPageInputs = [];
+    async handleSaveNameInputChanged() {
+        return this.update();
+    }
+
+    async handleApplyInputChanged() {
+        return this.update();
+    }
+
+    async handleSaveNameButtonClicked() {
         try {
-            // get the hashCode of the page
-            const hashCode = await this.service.getHashCode();
-            // load stored items
-            savedPageInputs = (await this.storage.getSavedPageInputs(`${hashCode}`)) || [];
+            // get the desired name from the user
+            const name = this.page.getSaveNameInput().value;
+
+            // get the inputs+values from the page
+            const inputs = await this.service.getPageInputsAndValues();
+
+            // save the inputs+values under the desired name
+            await this.storage.savePageInputs(name, inputs);
+
+            // clear the input & disable the button
+            this.page.getSaveNameInput().value = '';
+            this.page.getSaveNameButton().disabled = true;
+
+            this.page.setSaveOutput('Successfully saved inputs');
+            await this.updateApplySelectOptions();
         }
         catch (error) {
-            this.setErrorOutput('Failed to fetch page unique identifier');
+            this.page.setErrorOutput('An error occurred while saving');
             console.error(error);
-            savedPageInputs = [];
+        }
+    }
+
+    async handleApplyInputButtonClicked() {
+        try {
+
+            // read the desired saved name
+            const name = this.page.getApplyInputSelect().value;
+    
+            // retrieve the inputs+values saved under the name
+            const savedPageInputs = await this.storage.getSavedPageInput(name);
+
+            // apply the inputs+values on the page
+            await this.service.applyPageInputs(savedPageInputs);
+
+            // clear the select and disable the button
+            this.page.getApplyInputSelect().value = '';
+            this.page.getApplyInputButton().disabled = true;
+
+            this.page.setApplyOutput('Successfully applied inputs');
+        }
+        catch (error) {
+            this.page.setErrorOutput('An error occurred while applying');
+            console.error(error);    
+        }
+    }
+
+    async updateApplySelectOptions() {
+        const applyInputSelect = this.page.getApplyInputSelect();
+        let savedPageInputs = [];
+        try {
+            // load all stored items
+            savedPageInputs = await this.storage.getAllSavedPageInputs();
+        }
+        catch (error) {
+            this.setErrorOutput('Failed to fetch stored inputs');
+            console.error(error);
+            savedPageInputs = {};
             return false;
         }
 
@@ -481,39 +448,12 @@ class PopupDocumentController {
         });
     }
 
-    async updateCurrentPageIdentifier() {
-        // get the preferred type
-        const userSelectedPageIdentifier = await this.storage.getUserSelectedPageIdentifier();   
-        
-        const [
-            pageIdOption,
-            pageOriginOption,
-        ] = this.getUserSelectedPageId();
-
-        if (userSelectedPageIdentifier === 'pageId') {
-            // get the hashCode
-            const hashCode = await this.service.getHashCode();
-            this.setPageIdOutput(`${hashCode}`);
-
-            pageIdOption.checked = true;
-            pageOriginOption.checked = false;
-        }
-        else {
-            // get the page url
-            const pageOrigin = await this.service.getPageOrigin();
-            this.setPageIdOutput(pageOrigin);
-
-            pageIdOption.checked = false;
-            pageOriginOption.checked = true;
-        }
-    }
-
     update() {
-        const saveNameInput = this.getSaveNameInput();
-        const saveNameButton = this.getSaveNameButton();
+        const saveNameInput = this.page.getSaveNameInput();
+        const saveNameButton = this.page.getSaveNameButton();
 
-        const applyInputSelect = this.getApplyInputSelect();
-        const applyInputButton = this.getApplyInputButton();
+        const applyInputSelect = this.page.getApplyInputSelect();
+        const applyInputButton = this.page.getApplyInputButton();
 
         // disable the save button if the name input is empty
         if (!saveNameInput.value) {
@@ -532,10 +472,10 @@ class PopupDocumentController {
         }
 
         // clear any messages
-        this.setSaveOutput('');
-        this.setApplyOutput('');
-        this.setOverallOutput('');
-        this.setErrorOutput('');
+        this.page.setSaveOutput('');
+        this.page.setApplyOutput('');
+        this.page.setOverallOutput('');
+        this.page.setErrorOutput('');
     }
 }
 
