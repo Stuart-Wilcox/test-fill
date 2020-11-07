@@ -1,188 +1,4 @@
 (function(){
-
-/***** TABS *****/
-class Tabs {
-    static get tabs() {
-        let _tabs;
-        try {
-            if (tabs) {
-                _tabs = tabs;
-            }
-        }
-        catch (error) {
-            _tabs = chrome.tabs;
-        }
-        finally {
-            return _tabs;
-        }
-    }
-
-    static async getCurrentTab() {
-        return new Promise((resolve, reject) => {
-            Tabs.tabs.query({ active: true, currentWindow: true }, tabs => {
-                if (Service.runtime.lastError) {
-                    reject(Service.runtime.lastError);
-                    return;
-                }
-                if (tabs[0]) {
-                    resolve(tabs[0]);
-                }
-                else {
-                    reject(new Error('Tab matching query not found'));
-                }
-            });
-        });
-    }
-
-    static async executeScript(script) {
-        const tab = await Tabs.getCurrentTab();
-        return new Promise((resolve, reject) => {
-            Tabs.tabs.executeScript(tab.id, script, (results) => {
-                if (Service.runtime.lastError) {
-                    reject(Service.runtime.lastError);
-                }
-                else {
-                    resolve(results);
-                }
-            });
-        });
-    }
-}
-
-/***** STORE *****/
-class Store {
-    static get storage() {
-        let _storage;
-        try {
-            if (storage) {
-                _storage = storage;
-            }
-        }
-        catch (error) {
-            _storage = chrome.storage;
-        }
-        finally {
-            return _storage;
-        }
-    }
-
-    constructor() {
-
-    }
-
-    /**
-     * Saves the input name-value pairs under the given name
-     * @param { string } name 
-     * @param { Promise<Array<{ name: string, value: string }>> } inputs 
-     */
-    async savePageInputs(name, inputs) {
-        // get everything in storage already
-        return new Promise((resolve, reject) => {
-            Store.storage.local.set({ [name]: inputs }, () => {
-                if (Service.runtime.lastError) {
-                    reject(Service.runtime.lastError);
-                }
-                else {
-                    resolve(inputs);
-                }
-            });
-        });
-    }
-
-    /**
-     * Gets the saved input name-value pairs
-     * @param { Promise<{ [name: string]: Array<{ name: string, value: string }> }> } hashCode
-     */
-    async getSavedPageInput(name) {
-        return new Promise((resolve, reject) => {
-            Store.storage.local.get(name, (item) => {
-                if (Service.runtime.lastError) {
-                    reject(Service.runtime.lastError);
-                }
-                else {
-                    resolve(item[name]);
-                }
-            });
-        });
-    }
-
-    /**
-     * Gets the saved input name-value pairs
-     * @param { Promise<{ [name: string]: Array<{ name: string, value: string }> }> } hashCode
-     */
-    async getAllSavedPageInputs() {
-        return new Promise((resolve, reject) => {
-            Store.storage.local.get(null, (item) => {
-                if (Service.runtime.lastError) {
-                    reject(Service.runtime.lastError);
-                }
-                else {
-                    resolve(item);
-                }
-            });
-        });
-    }
-}
-
-/***** SERVICE *****/
-class Service {
-    static get runtime() {
-        let _runtime;
-        try {
-            _runtime = browser.runtime;
-        }
-        catch (error) {
-            _runtime = chrome.runtime;
-        }
-        finally {
-            return _runtime;
-        }
-    }
-
-    constructor() {
-
-    }
-
-    async sendMessage(type, payload) {
-        const message = { type, payload };
-        return new Promise(async (resolve, reject) => {
-            try {
-                const tab = await Tabs.getCurrentTab();
-                Tabs.tabs.sendMessage(tab.id, message, response => {
-                    if (Service.runtime.lastError) {
-                        reject(Service.runtime.lastError);
-                    }
-                    else {
-                        resolve(response);
-                    }
-                })
-            }
-            catch (error) {
-                reject(error);
-            }
-        });
-    }
-
-    /**
-     * @return { Promise<Array<{name: string, value: string}>> }
-     */
-    async getPageInputsAndValues() {
-        const type = 'GET_PAGE_INPUTS_AND_VALUES';
-        return this.sendMessage(type);
-    }
-
-    /**
-     * @param { Array<{ name: string, value: string }> } inputs The array of inputs to apply
-     * @return { Promise<void> }
-     */
-    async applyPageInputs(inputValues) {
-        const type = 'APPLY_PAGE_INPUTS';
-        return this.sendMessage(type, inputValues);
-    }
-}
-
-
-
 /***** DOCUMENT CONTROLS *****/
 
 /**
@@ -219,6 +35,10 @@ class PopupDocumentPage {
 
     getErrorOutput() {
         return window.document.querySelector('#errorOutput');
+    }
+
+    getOptionsLink() {
+        return window.document.querySelector('#options');
     }
 
     setSaveOutput(output, duration=3000) {
@@ -302,6 +122,7 @@ class PopupDocumentController {
         const saveNameButton = this.page.getSaveNameButton();
         const applyInputSelect = this.page.getApplyInputSelect();
         const applyInputButton = this.page.getApplyInputButton();
+        const optionsLink = this.page.getOptionsLink();
         
         // disable the buttons and inputs
         saveNameInput.disabled = true;
@@ -331,6 +152,9 @@ class PopupDocumentController {
 
         // add apply button press
         applyInputButton.addEventListener('click', () => this.handleApplyInputButtonClicked());
+
+        // add options link press
+        optionsLink.addEventListener('click', (event) => this.handleOptionsLinkClicked(event));
 
         // re-enable the inputs
         saveNameInput.disabled = false;
@@ -406,6 +230,19 @@ class PopupDocumentController {
         catch (error) {
             this.page.setErrorOutput('An error occurred while applying');
             console.error(error);    
+        }
+    }
+
+    async handleOptionsLinkClicked(event) {
+        event.preventDefault();
+        try {
+            let result = await Service.runtime.openOptionsPage();
+            console.log(result);
+            return result;
+        }   
+        catch (error) {
+            console.error(error);
+            return false;
         }
     }
 

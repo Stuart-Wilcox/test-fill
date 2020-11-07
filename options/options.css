@@ -1,0 +1,13 @@
+body {
+    font-family: 'Roboto', sans-serif;
+    font-size: 12px;
+}
+
+.content {
+    max-width: 600px;
+    margin: auto;
+}
+
+table {
+    width: 100%;
+}
