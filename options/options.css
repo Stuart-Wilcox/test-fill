@@ -52,3 +52,29 @@ td.actions > div {
 td.actions > div:hover {
     background-color: #E1E1E1;
 }
+
+.dropdown {
+    background-color: #FFF;
+    max-width: min-content;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.dropdown-item {
+    padding: 5px;
+    border: solid rgba(0, 0, 0, 0.5) 1px;
+    cursor: pointer;
+}
+
+.dropdown-item:last-child {
+    border-top: none;
+}
+
+.dropdown-item:first-child {
+    border-top: solid rgba(0, 0, 0, 0.5) 1px;
+}
+
+.dropdown-item:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}

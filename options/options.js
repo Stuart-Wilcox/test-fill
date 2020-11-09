@@ -6,11 +6,26 @@
      * Controls the UI elements on the page
      */
     class OptionsDocumentPage {
+        constructor() {
+            this.isActionMenuOpen = false;
+            this.hideActionMenu();
+
+            // setup click away listener on the page
+            document.body.addEventListener('click', event => {
+                // check if the event occured inside the action menu
+                const actionMenu = this.getActionMenu();
+                if (!actionMenu || !actionMenu.contains(event.target)) {
+                    // close the action menu
+                    this.hideActionMenu();
+                }
+            });
+        }
+
         getDisplayTable() {
             return window.document.querySelector('#displayTable');
         }
 
-        createActionIcon() {
+        createActionIcon(name) {
             const div = window.document.createElement('div');
             const svg = window.document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -20,6 +35,8 @@
 
             svg.setAttributeNS(null, 'class', 'actions-icon');
             svg.setAttributeNS(null, 'viewBox', '0 0 24 24');
+
+            div.setAttribute('id', `actions-${name}`);
 
             svg.appendChild(path);
             div.appendChild(svg);
@@ -40,7 +57,7 @@
             const tdName = window.document.createElement('td');
             const tdActions = window.document.createElement('td');
 
-            const actionIcon = this.createActionIcon();
+            const actionIcon = this.createActionIcon(name);
 
             tdName.innerText = name;
             tdActions.setAttribute('class', 'actions');
@@ -51,6 +68,120 @@
 
             const displayTable = this.getDisplayTable();
             displayTable.appendChild(row);
+        }
+
+        getAllActionIcons() {
+            // get the action icons
+            const allActionIconsList = window.document.querySelectorAll('td.actions > div');
+
+            // use this to hold a map from name to icon element
+            const allActionIcons = {};
+
+            allActionIconsList.forEach(actionIcon => {
+                const id = actionIcon.getAttribute('id');
+
+                // id is in the form `actions-${name}` and we want the name from it
+                const name = id.substring(8); 
+
+                // fill the map in
+                allActionIcons[name] = actionIcon;
+            });
+
+            return allActionIcons;
+        }
+
+        /**
+         * Sets up the action icons and menu
+         * @param {(name: string) =>  void} actionClickedCallback Callback invoked when a menu item is clicked
+         */
+        setupActionIcons(actionClickedCallback) {
+            const allActionIcons = this.getAllActionIcons();
+            for (const name in allActionIcons) {
+                const element = allActionIcons[name];
+                element.addEventListener('click', event => {
+                    event.stopPropagation();
+
+                    // close the action menu if needed
+                    if (this.isActionMenuOpen) {
+                        console.log('hiding action menu');
+                        this.hideActionMenu();
+                    }
+
+                    this.showActionMenu(event.pageY, event.pageX);
+                    this.setupActionMenu(actionClickedCallback);
+                });
+            }
+        }
+
+        getOriginalActionMenu() {
+            return window.document.querySelector('#original-options-dropdown');
+        }
+
+        getActionMenu() {
+            return window.document.querySelector('#options-dropdown');
+        }
+
+        /**
+         * Shows the action menu, if not already open
+         * @param {number} top 
+         * @param {number} left 
+         * @return {boolean} success of the operation
+         */
+        showActionMenu(top, left) {
+            if (this.isActionMenuOpen) {
+                console.log('Action menu already open :(');
+                return false;
+            }
+
+            // get the original action menu
+            const originalActionMenu = this.getOriginalActionMenu();
+
+            // make a copy of it
+            const actionMenu = originalActionMenu.cloneNode(true);
+            actionMenu.setAttribute('id', 'options-dropdown');
+
+            // place it as needed
+            actionMenu.style.top = `${top}px`;
+            actionMenu.style.left = `${left}px`;
+            actionMenu.style.display = 'block';
+
+            // add it to the page
+            window.document.querySelector('.content').appendChild(actionMenu);
+
+            this.isActionMenuOpen = true;
+            return true;
+        }
+
+        /**
+         * Hides the action menu, if not already hidden
+         * @return {boolean} success of the operation
+         */
+        hideActionMenu() {
+            if (!this.isActionMenuOpen) {
+                return false;
+            }
+
+            const actionMenu = this.getActionMenu();
+            if (!actionMenu) {
+                return true;
+            }
+
+            window.document.querySelector('.content').removeChild(actionMenu);
+            this.isActionMenuOpen = false;
+            return true;
+        }
+
+        /**
+         * Sets up event listeners for action menu option clicking
+         * @param {string} optionClickedCallback Callback called with name of option clicked 
+         */
+        setupActionMenu(optionClickedCallback) {
+            const actionMenu = this.getActionMenu();
+            for (const option of actionMenu.children) {
+                option.addEventListener('click', () => {
+                    optionClickedCallback(option.innerText);
+                });
+            }
         }
     }
 
@@ -78,7 +209,9 @@
             });
 
             // set up listener for clicking row actions
-            // TODO
+            this.page.setupActionIcons(name => {
+                console.log(`${name} clicked`);
+            });
 
             return true;
         }
