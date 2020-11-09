@@ -19,47 +19,45 @@
         runtime = chrome.runtime;
     }
 
-    /** 
-     * Get hash from a string
-     * @param { string } s Input string
-     * @return { number } Hash results
-     */
-    const hashCode = s => s.split('').reduce((a, b) => (((a << 5) - a) + b.charCodeAt(0)) | 0, 0);
-
     /**
-     * Searches the document for all inputs and copies their names and values
-     * @return {
-     *  inputNamesHashCode: { string } The hash code of the page's inputs
-     *  inputMap: {{ [string]: string }}  The map of name - value for all the page's inputs   
-     * }
+     * Get the given input's value
+     * @param {HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement} input
      */
-    const scanPageForInputs = () => {
-        // get all the inputs on the page
-        const inputs = Array.from(document.querySelectorAll('input'));
-
-        const inputMap = inputs.reduce((inputMap, input) => {
-            inputMap[input.name] = input.value;
-            return inputMap;
-        }, {});
-        const inputNames = inputs.map(input => input.name).join('');
-        const inputNamesHashCode = hashCode(inputNames);
-
-        return {
-            inputNamesHashCode,
-            inputMap,
-        };
+    const getInputValue = (input) => {
+        if (input.type === 'checkbox') {
+            return input.checked;
+        }
+        else if (input.type === 'radio') {
+            return input.checked ? input.name : null;
+        }
+        else if (input.tagName === 'textarea') {
+            return input.innerText;
+        }
+        else {
+            return input.value || '';
+        }
     };
 
     /**
-     * Returns the hashcode for this page
+     * Sets the given input's value
+     * @param {HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement} input
+     * @param {string} value
      */
-    const getHashCode = () => {
-        // get all the inputs on the page
-        const inputs = Array.from(document.querySelectorAll('input'));
-        const inputNames = inputs.map(input => input.name).join('');
-        const inputNamesHashCode = hashCode(inputNames);
-        return `${inputNamesHashCode}`;
-    }
+    const setInputValue = (input, value) => {
+        
+        if (input.type === 'checkbox') {
+            input.checked = value;
+        }
+        else if (input.type === 'radio') {
+            input.checked = input.name === value;
+        }
+        else if (input.tagName === 'textarea') {
+            input.innerText = value;
+        }
+        else {
+            input.value = value;
+        }
+    };
 
     /**
      * Applies the given name-value pairs for inputs to the page
@@ -72,13 +70,36 @@
             return acc;
         }, {});
 
-        const inputs = document.querySelectorAll('input');
+        const inputs = document.querySelectorAll('input,textarea,select');
+        const notFoundInputValues = new Set(Object.keys(inputMap));
+        const notFoundInputs = [];
 
         // loop through all inputs and set their value from the map
         for (const input of inputs) {
             // find the input name in the map
-            const inputValue = inputMap[input.name] || '';
-            input.value = inputValue;
+            if (input.name in inputMap) {
+                const inputValue = inputMap[input.name];
+
+                setInputValue(input, inputValue);
+                notFoundInputValues.delete(input.name);
+            }
+            // see if matched by id
+            else if (input.id in inputMap){
+                const inputValue = inputMap[input.id];
+
+                setInputValue(input,  inputValue);
+                notFoundInputValues.delete(input.id);
+            }
+            else {
+                notFoundInputs.push(input);
+            }
+        }
+
+        // apply the remaining not found inputs in order
+        const notFoundInputValuesList = Array.from(notFoundInputValues);
+        for (const input of notFoundInputs) {
+            // get first value from not used list and set it for input value
+            setInputValue(input, notFoundInputValuesList.shift());
         }
     };
 
@@ -87,21 +108,20 @@
      * @return { Array<{ name: string, value: string }> } The list of name-value pairs 
      */
     const getPageInputsAndValues = () => {
-        const inputs = Array.from(document.querySelectorAll('input'));
+        const inputs = Array.from(document.querySelectorAll('input,textarea,select'));
         return inputs.map(input => {
-            return {
-                name: input.name,
-                value: input.value,
-            };
-        });
-    };
+            const name = input.name || input.id;
+            const value = getInputValue(input);
 
-    /**
-     * Gets the current page url
-     * @return { string }
-     */
-    const getCurrentPageOrigin = () => {
-        return window.location.origin; 
+            if (value !== null) {
+                return {
+                    name,
+                    value,
+                };
+            }
+
+            return null;
+        }).filter(input => input !== null);
     };
 
     // hook up event listeners
@@ -123,16 +143,6 @@
                 }).catch(error => {
                     console.warn(error);
                 });
-                break;
-            }
-            case 'GET_HASHCODE': {
-                const hashCode = getHashCode();   
-                sendResponse(hashCode);
-                break;
-            }
-            case 'GET_PAGE_ORIGIN': {
-                const pageOrigin = getCurrentPageOrigin();
-                sendResponse(pageOrigin);
                 break;
             }
             default: {
