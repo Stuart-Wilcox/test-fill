@@ -46,7 +46,7 @@
 
         clearDisplayTable() {
             const displayTable = this.getDisplayTable();
-            const children = displayTable.children;
+            const children = Array.from(displayTable.children);
             for (let child of children) {
                 displayTable.removeChild(child);
             }
@@ -92,7 +92,7 @@
 
         /**
          * Sets up the action icons and menu
-         * @param {(name: string) =>  void} actionClickedCallback Callback invoked when a menu item is clicked
+         * @param {(actionName: string, rowName: string) =>  void} actionClickedCallback Callback invoked when a menu item is clicked
          */
         setupActionIcons(actionClickedCallback) {
             const allActionIcons = this.getAllActionIcons();
@@ -103,12 +103,11 @@
 
                     // close the action menu if needed
                     if (this.isActionMenuOpen) {
-                        console.log('hiding action menu');
                         this.hideActionMenu();
                     }
 
                     this.showActionMenu(event.pageY, event.pageX);
-                    this.setupActionMenu(actionClickedCallback);
+                    this.setupActionMenu(actionClickedCallback, name);
                 });
             }
         }
@@ -175,11 +174,11 @@
          * Sets up event listeners for action menu option clicking
          * @param {string} optionClickedCallback Callback called with name of option clicked 
          */
-        setupActionMenu(optionClickedCallback) {
+        setupActionMenu(optionClickedCallback, name) {
             const actionMenu = this.getActionMenu();
             for (const option of actionMenu.children) {
                 option.addEventListener('click', () => {
-                    optionClickedCallback(option.innerText);
+                    optionClickedCallback(option.innerText, name);
                 });
             }
         }
@@ -209,8 +208,46 @@
             });
 
             // set up listener for clicking row actions
-            this.page.setupActionIcons(name => {
-                console.log(`${name} clicked`);
+            this.page.setupActionIcons(async (actionName, name) => {
+                switch (actionName) {
+                    case 'Remove': {
+                        try {
+                            await this.storage.removeSavedPageInput(name);
+                        }
+                        catch (error) {
+                            console.error(error);
+                        }
+
+                        // hide action menu
+                        this.page.hideActionMenu();
+
+                        // re-render with row removed
+                        try {
+                            await this.cleanup();
+                            await this.render();
+                        }
+                        catch (error) {
+                            console.error(error);
+                        }
+                    }
+                    case 'Rename': {
+                        // TODO handle rename
+                        // for now this case should not be reached
+
+                        // hide action menu
+                        this.page.hideActionMenu();
+
+                        // re-render with row removed
+                        try {
+                            await this.cleanup();
+                            await this.render();
+                        }
+                        catch (error) {
+                            console.error(error);
+                        }
+                        
+                    }
+                }
             });
 
             return true;

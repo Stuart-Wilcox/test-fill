@@ -71,4 +71,27 @@ class Store {
             });
         });
     }
+
+    /**
+     * Removed the inputs saved at name
+     * @param {string} name 
+     */
+    async removeSavedPageInput(name) {
+        //  check to make sure exists
+        const inputs = await this.getSavedPageInput(name);
+        if (!inputs) {
+            return Promise.reject(new Error('Not found'));
+        }
+
+        return new Promise((resolve, reject) => {
+            Store.storage.local.remove(name, () => {
+                if (Service.runtime.lastError) {
+                    reject(Service.runtime.lastError);
+                }
+                else {
+                    resolve();
+                }
+            });
+        });
+    }
 }
