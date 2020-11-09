@@ -20,6 +20,30 @@
     }
 
     /**
+     * Get the input's name (or other unique identifier) 
+     * @param {HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement} input
+     */
+    const getInputName = (input) => {
+        // try to use name
+        if (input.name) {
+            return input.name;
+        }
+        
+        // try to use id
+        if (input.id) {
+            return input.id;
+        }
+
+        // use random id
+        const randomId = new Array(10)
+            .fill(0)
+            .map(() => Math.floor(Math.random() * 16))
+            .map(digit => digit.toString(16))
+            .join('');
+        return randomId;
+    };
+
+    /**
      * Get the given input's value
      * @param {HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement} input
      */
@@ -76,19 +100,14 @@
 
         // loop through all inputs and set their value from the map
         for (const input of inputs) {
+            const name = getInputName(input);
+
             // find the input name in the map
-            if (input.name in inputMap) {
-                const inputValue = inputMap[input.name];
+            if (name in inputMap) {
+                const inputValue = inputMap[name];
 
                 setInputValue(input, inputValue);
-                notFoundInputValues.delete(input.name);
-            }
-            // see if matched by id
-            else if (input.id in inputMap){
-                const inputValue = inputMap[input.id];
-
-                setInputValue(input,  inputValue);
-                notFoundInputValues.delete(input.id);
+                notFoundInputValues.delete(name);
             }
             else {
                 notFoundInputs.push(input);
@@ -110,7 +129,7 @@
     const getPageInputsAndValues = () => {
         const inputs = Array.from(document.querySelectorAll('input,textarea,select'));
         return inputs.map(input => {
-            const name = input.name || input.id;
+            const name = getInputName(input);
             const value = getInputValue(input);
 
             if (value !== null) {
